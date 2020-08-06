@@ -1,5 +1,5 @@
 [package]
-name = "ssd1351_spidev"
+name = "ssd1351_pideoplayer"
 version = "0.1.0"
 authors = ["Daniel Trnka <daniel.trnka@gmail.com>"]
 edition = "2018"

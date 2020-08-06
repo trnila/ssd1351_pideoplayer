@@ -150,7 +150,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ssd1351_spidev"
+name = "ssd1351_pideoplayer"
 version = "0.1.0"
 dependencies = [
  "gpio-cdev",
