@@ -150,19 +150,19 @@ impl From<gpio_cdev::errors::Error> for TransferError {
 }
 
 impl Display {
-    pub fn new(spidev: u32, cs: u32, dc_line: LineHandle) -> Result<Self, TransferError> {
+    pub fn new(spidev: u32, cs: u32, dc_line: LineHandle, width: usize, height: usize) -> Result<Self, TransferError> {
         let mut spi = Spidev::open(format!("/dev/spidev{}.{}", spidev, cs))?;
 		let options = SpidevOptions::new()
 			 .bits_per_word(8)
-			 .max_speed_hz(5_000_000)
+			 .max_speed_hz(20_000_000)
 			 .mode(SpiModeFlags::SPI_MODE_0)
 			 .build();
 		spi.configure(&options)?;
         let mut disp = Display {
             spi,
             dc: dc_line,
-            width: 128,
-            height: 128,
+            width,
+            height,
         };
         disp.init()?;
         Ok(disp)
