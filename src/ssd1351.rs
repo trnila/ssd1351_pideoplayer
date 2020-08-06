@@ -3,9 +3,9 @@ use spidev::{SpiModeFlags, Spidev, SpidevOptions};
 use std::fmt;
 use std::io::Write;
 
-pub struct Display {
+pub struct Display<'a> {
     spi: Spidev,
-    dc: LineHandle,
+    dc: &'a LineHandle,
     width: usize,
     height: usize,
 }
@@ -149,11 +149,11 @@ impl From<gpio_cdev::errors::Error> for TransferError {
     }
 }
 
-impl Display {
+impl<'a> Display<'a> {
     pub fn new(
         spidev: u32,
         cs: u32,
-        dc_line: LineHandle,
+        dc_line: &'a LineHandle,
         width: usize,
         height: usize,
     ) -> Result<Self, TransferError> {
