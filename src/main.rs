@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
 extern crate spidev;
-use std::{thread, time};
 use gpio_cdev::{Chip, LineRequestFlags};
-use video::{MappedVideo, VideoAnimation};
 use ssd1351::*;
+use std::{thread, time};
+use video::{MappedVideo, VideoAnimation};
 
-mod video;
-mod ssd1351;
 mod framebuffer;
+mod ssd1351;
+mod video;
 
 fn main() -> Result<(), Box<dyn ::std::error::Error>> {
     const GPIO_RST: u32 = 25;
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn ::std::error::Error>> {
     const HEIGHT: usize = 128;
 
     let mut chip = Chip::new("/dev/gpiochip0")?;
-    
+
     let rst = chip
         .get_line(GPIO_RST)?
         .request(LineRequestFlags::OUTPUT, 0, "oled-reset")?;
@@ -28,13 +28,12 @@ fn main() -> Result<(), Box<dyn ::std::error::Error>> {
         .get_line(GPIO_DC)?
         .request(LineRequestFlags::OUTPUT, 0, "oled-dc")?;
 
-
     let mut disp = Display::new(0, 0, dc, WIDTH, HEIGHT)?;
-	
-	let video = MappedVideo::new("../disp/vsb.raw", WIDTH, HEIGHT, 2)?;
-	let anim = VideoAnimation::new(&video);
-	for frame in anim {
-		disp.render(frame)?;
-	}
+
+    let video = MappedVideo::new("../disp/vsb.raw", WIDTH, HEIGHT, 2)?;
+    let anim = VideoAnimation::new(&video);
+    for frame in anim {
+        disp.render(frame)?;
+    }
     Ok(())
 }
