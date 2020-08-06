@@ -1,6 +1,5 @@
 use memmap::MmapOptions;
 use std::fs::File;
-use std::error;
 use std::fmt;
 
 pub struct MappedVideo {
@@ -14,12 +13,13 @@ pub enum VideoMapError {
 	IOError(std::io::Error),
 	CorruptedFile(usize)
 }
+impl std::error::Error for VideoMapError {}
 
 impl fmt::Display for VideoMapError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			VideoMapError::CorruptedFile(size) => write!(f, "wrong file size: {}", size),
-			VideoMapError::IOError(err) => write!(f, "err"),
+			VideoMapError::IOError(err) => write!(f, "err: {}", err),
 		}
     }
 }

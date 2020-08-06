@@ -1,48 +1,41 @@
 extern crate spidev;
-extern crate byteorder;
 use std::{thread, time};
-use memmap::MmapOptions;
-use std::fs::File;
-use std::error;
-use std::fmt;
-use gpio_cdev::{Chip, LineRequestFlags, LineHandle};
+use gpio_cdev::{Chip, LineRequestFlags};
 
 mod video;
 mod ssd1351;
 mod framebuffer;
 
 use video::{MappedVideo, VideoAnimation};
-use framebuffer::{FrameBuffer, Color};
 use ssd1351::*;
 
-fn main() {
-    let mut chip = Chip::new("/dev/gpiochip0").unwrap();
+fn main() -> Result<(), Box<dyn ::std::error::Error>> {
+    let mut chip = Chip::new("/dev/gpiochip0")?;
     
     let rst = chip
-        .get_line(25).unwrap()
-        .request(LineRequestFlags::OUTPUT, 1, "reset").unwrap();
+        .get_line(25)?
+        .request(LineRequestFlags::OUTPUT, 1, "oled-reset")?;
 
-    rst.set_value(1).unwrap();
+    rst.set_value(1)?;
     thread::sleep(time::Duration::from_millis(1));
-    rst.set_value(0).unwrap();
+    rst.set_value(0)?;
     thread::sleep(time::Duration::from_millis(1));
-    rst.set_value(1).unwrap();
+    rst.set_value(1)?;
     
 
     let dc = chip
-        .get_line(24).unwrap()
-        .request(LineRequestFlags::OUTPUT, 0, "dc").unwrap();
+        .get_line(24)?
+        .request(LineRequestFlags::OUTPUT, 0, "oled-dc")?;
 
     const WIDTH: usize = 128;
     const HEIGHT: usize = 128;
 
-    let mut fb = FrameBuffer::new();
-    let mut disp = Display::new(0, 0, dc).unwrap();
-    
+    let mut disp = Display::new(0, 0, dc)?;
 	
-	let video = MappedVideo::new("../disp/vsb.raw", WIDTH, HEIGHT, 2).unwrap();
+	let video = MappedVideo::new("../disp/vsb.raw", WIDTH, HEIGHT, 2)?;
 	let anim = VideoAnimation::new(&video);
 	for frame in anim {
-		disp.render(frame);
+		disp.render(frame)?;
 	}
+    Ok(())
 }

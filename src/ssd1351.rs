@@ -1,7 +1,7 @@
 use std::io::Write;
-use spidev::{Spidev, SpidevOptions, SpidevTransfer, SpiModeFlags};
-use gpio_cdev::{Chip, LineRequestFlags, LineHandle};
-use byteorder::{LittleEndian, WriteBytesExt};
+use spidev::{Spidev, SpidevOptions, SpiModeFlags};
+use gpio_cdev::LineHandle;
+use std::fmt;
 
 pub struct Display {
    spi: Spidev,
@@ -56,7 +56,7 @@ pub enum Command {
    SetDisplayModeNormal,
    SetDisplayModeInverse,
    FunctionSelection{
-    internalRegulator: bool,
+    internal_regulator: bool,
     interface: Interface,
    },
    Nop,
@@ -124,10 +124,17 @@ pub enum MCUProtection {
     AdditionalCommandsInUnlock = 0xb1,
 }
 
+#[derive(Debug)]
 pub enum TransferError {
     SPIError(std::io::Error),
     GPIOError(gpio_cdev::errors::Error),
-    PartialTransfer(usize),
+}
+impl std::error::Error for TransferError {}
+
+impl fmt::Display for TransferError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "err")        
+    }
 }
 
 impl From<std::io::Error> for TransferError {
@@ -143,7 +150,7 @@ impl From<gpio_cdev::errors::Error> for TransferError {
 }
 
 impl Display {
-    pub fn new(spidev: u32, cs: u32, dc_line: LineHandle) -> Result<Self, std::io::Error> {
+    pub fn new(spidev: u32, cs: u32, dc_line: LineHandle) -> Result<Self, TransferError> {
         let mut spi = Spidev::open(format!("/dev/spidev{}.{}", spidev, cs))?;
 		let options = SpidevOptions::new()
 			 .bits_per_word(8)
@@ -157,21 +164,21 @@ impl Display {
             width: 128,
             height: 128,
         };
-        disp.init();
+        disp.init()?;
         Ok(disp)
     }
 
-    fn init(&mut self) {
-        self.config(Command::SetCommandLock(MCUProtection::Unlock));
-        self.config(Command::SetCommandLock(MCUProtection::AdditionalCommandsInUnlock));
-        self.config(Command::SetSleepModeOn); 
+    fn init(&mut self) -> Result<(), TransferError> {
+        self.config(Command::SetCommandLock(MCUProtection::Unlock))?;
+        self.config(Command::SetCommandLock(MCUProtection::AdditionalCommandsInUnlock))?;
+        self.config(Command::SetSleepModeOn)?; 
         self.config(Command::Clocks {
             divider: ClkDiv::Div2,
             osc_freq: 0xF,
-        });
-        self.config(Command::SetMuxRatio(0x7f));
-        self.config(Command::SetColumnAddress(0, self.width as u8 - 1));
-        self.config(Command::SetRowAddress(0, self.height as u8 - 1));
+        })?;
+        self.config(Command::SetMuxRatio(0x7f))?;
+        self.config(Command::SetColumnAddress(0, self.width as u8 - 1))?;
+        self.config(Command::SetRowAddress(0, self.height as u8 - 1))?;
         self.config(Command::SetReMapColorDepth {
             vert_increment: false,
             column_invert: false,
@@ -179,65 +186,52 @@ impl Display {
             scan_from_n: true,
             enable_com_split: true,
             color_depth: ColorDepth::Color65k,
-        });
-        self.config(Command::SetDisplayStartLine(0));
-        self.config(Command::SetDisplayOffset(0));
+        })?;
+        self.config(Command::SetDisplayStartLine(0))?;
+        self.config(Command::SetDisplayOffset(0))?;
         self.config(Command::SetGPIO {
             gpio0: PinState::HiZInputDisabled, 
             gpio1: PinState::HiZInputDisabled, 
-        });
+        })?;
         self.config(Command::FunctionSelection{
-            internalRegulator: true,
+            internal_regulator: true,
             interface: Interface::Parallel8, 	
-        });
+        })?;
 
         //
         self.config(Command::SetResetPreCharge{
             phase_1: 0x2,
             phase_2: 0x3
-        });
+        })?;
         self.config(Command::SetSegmentLowVoltage{
             external: true
-        });
-        self.config(Command::SetVComVoltage(0x05));
-        self.config(Command::MasterContrast(0x0F));
-        self.config(Command::SetPreChargeVoltage(0x01));
-        self.config(Command::SetDisplayModeNormal);
+        })?;
+        self.config(Command::SetVComVoltage(0x05))?;
+        self.config(Command::MasterContrast(0x0F))?;
+        self.config(Command::SetPreChargeVoltage(0x01))?;
+        self.config(Command::SetDisplayModeNormal)?;
         self.config(Command::SetContrast{
             r: 0xff,
             g: 0xff,
             b: 0xff,
-        });
-        self.config(Command::SetSleepModeOff);
-        self.config(Command::WriteRam);
+        })?;
+        self.config(Command::SetSleepModeOff)?;
+        self.config(Command::WriteRam)?;
+        Ok(())
     }
 
     pub fn render(&mut self, fb: &[u8]) -> Result<(), TransferError> {
-        self.data_mode(true);
+        self.data_mode(true)?;
         self.xmit(fb)
     }
 
     fn xmit(&mut self, data: &[u8]) -> Result<(), TransferError> {
-        let bufsize = data.len();
-        match self.spi.write(&data)? {
-            bufsize => Ok(()),
-            sent => Err(TransferError::PartialTransfer(sent))
-        }        
+        self.spi.write(&data)?;
+        Ok(())
     }
 
     fn data_mode(&mut self, data: bool) -> Result<(), TransferError> {
         Ok(self.dc.set_value(data as u8)?)
-    }
-
-    pub fn configa(&mut self, cmd: u8, data: &[u8]) {
-        self.dc.set_value(0).unwrap();
-        self.spi.write(&[cmd]);
-
-        if !data.is_empty() {
-            self.dc.set_value(1).unwrap();
-            self.spi.write(&data);
-        }
-
     }
 
     pub fn config(&mut self, option: Command) -> Result<(), TransferError> {
@@ -284,7 +278,7 @@ impl Display {
                 _ => unreachable!(),
             },
             Command::SetGPIO{gpio0, gpio1} => (0xb5, vec![(gpio0 as u8) | ((gpio1 as u8) >> 2)]),
-            Command::FunctionSelection{internalRegulator, interface} => (0xab, vec![(internalRegulator as u8) | ((interface as u8) << 6)]),
+            Command::FunctionSelection{internal_regulator, interface} => (0xab, vec![(internal_regulator as u8) | ((interface as u8) << 6)]),
             Command::SetResetPreCharge{phase_1, phase_2} => match (phase_1, phase_2) {
                 (2..=15, 3..=15) => (0xb1, vec![phase_1 | (phase_2 << 4)]),
                 _ => unreachable!(),
@@ -311,11 +305,11 @@ impl Display {
             _ => unreachable!()
         };        
 
-        self.data_mode(false);
+        self.data_mode(false)?;
         self.xmit(&[cmd])?;
 
         if !data.is_empty() {
-            self.data_mode(true);
+            self.data_mode(true)?;
             self.xmit(&data)?;
         }
         Ok(())
