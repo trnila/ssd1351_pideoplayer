@@ -1,13 +1,14 @@
+#![allow(dead_code)]
+
 extern crate spidev;
 use std::{thread, time};
 use gpio_cdev::{Chip, LineRequestFlags};
+use video::{MappedVideo, VideoAnimation};
+use ssd1351::*;
 
 mod video;
 mod ssd1351;
 mod framebuffer;
-
-use video::{MappedVideo, VideoAnimation};
-use ssd1351::*;
 
 fn main() -> Result<(), Box<dyn ::std::error::Error>> {
     const GPIO_RST: u32 = 25;
