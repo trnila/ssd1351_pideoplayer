@@ -52,8 +52,8 @@ impl<'a, ITER: Iterator<Item = &'a [u8]>> Player<'a, ITER> {
 }
 
 fn main() -> Result<(), Box<dyn ::std::error::Error>> {
-    const GPIO_RST: u32 = 25;
-    const GPIO_DC: u32 = 24;
+    const GPIO_RST: u32 = 24;
+    const GPIO_DC: u32 = 25;
     const WIDTH: usize = 128;
     const HEIGHT: usize = 128;
     const FPS: u32 = 25;
