@@ -1,79 +1,64 @@
-use memmap::MmapOptions;
-use std::fmt;
 use std::fs::File;
+use std::io::SeekFrom;
+use std::io::{Seek, Read};
+use thiserror::Error;
 
-pub struct MappedVideo {
-    memory: memmap::Mmap,
+#[derive(Error, Debug)]
+pub enum VideoError {
+    #[error("file size is not divisible by frame size: {file_size}")]
+    CorruptedFile {
+        file_size: u64,
+    },
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+}
+
+const FRAME_SIZE: usize = 128 * 128 * 2;
+
+pub struct Frame(pub [u8; FRAME_SIZE]);
+
+impl Frame {
+    pub fn new() -> Self {
+        Frame([0u8; FRAME_SIZE])
+    }
+}
+
+pub struct Video {
+    handle: File,
     frames: usize,
-    frame_bytes: usize,
+    pos: u64,
 }
 
-#[derive(Debug)]
-pub enum VideoMapError {
-    IOError(std::io::Error),
-    CorruptedFile(usize),
-}
-impl std::error::Error for VideoMapError {}
-
-impl fmt::Display for VideoMapError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            VideoMapError::CorruptedFile(size) => write!(f, "wrong file size: {}", size),
-            VideoMapError::IOError(err) => write!(f, "err: {}", err),
-        }
-    }
-}
-impl From<std::io::Error> for VideoMapError {
-    fn from(error: std::io::Error) -> Self {
-        VideoMapError::IOError(error)
-    }
-}
-impl MappedVideo {
-    pub fn new(
-        path: &str,
-        width: usize,
-        height: usize,
-        byte_depth: usize,
-    ) -> Result<Self, VideoMapError> {
+impl Video {
+    pub fn new(path: &str) -> Result<Self, VideoError> {
         let file = File::open(path)?;
 
-        let frame_bytes = width * height * byte_depth;
-        let file_bytes = file.metadata()?.len() as usize;
-        if file_bytes == 0 || file_bytes % frame_bytes != 0 {
-            return Err(VideoMapError::CorruptedFile(file_bytes));
+        let file_size = file.metadata()?.len();
+        if file_size == 0 || file_size % FRAME_SIZE as u64 != 0 {
+            return Err(VideoError::CorruptedFile{file_size});
         }
 
-        let mmap = unsafe { MmapOptions::new().map(&file)? };
-
-        Ok(MappedVideo {
-            memory: mmap,
-            frames: file_bytes / frame_bytes,
-            frame_bytes: frame_bytes,
+        Ok(Video {
+            handle: File::open(path)?,
+            pos: 0,
+            frames: file_size as usize / FRAME_SIZE,
         })
     }
 
-    pub fn frame(&self, num: usize) -> &[u8] {
-        let begin = num * self.frame_bytes;
-        return &self.memory[begin..begin + self.frame_bytes];
+    pub fn read_frame(&mut self, n: u64) -> Result<Frame, std::io::Error> {
+        let mut frame = Frame::new();
+        let offset = n * frame.0.len() as u64;
+
+        self.pos = match self.pos {
+            current_pos if current_pos == offset => offset,
+            _ => self.handle.seek(SeekFrom::Start(n * 128 * 128))? 
+        } + frame.0.len() as u64;
+
+        self.handle.read_exact(&mut frame.0)?;
+        Ok(frame)
     }
-}
 
-pub struct VideoAnimation<'a> {
-    video: &'a MappedVideo,
-    frame: usize,
-}
-
-impl<'a> VideoAnimation<'a> {
-    pub fn new(video: &'a MappedVideo) -> Self {
-        VideoAnimation { video, frame: 0 }
-    }
-}
-
-impl<'a> Iterator for VideoAnimation<'a> {
-    type Item = &'a [u8];
-    fn next(&mut self) -> Option<Self::Item> {
-        let current = self.frame;
-        self.frame = (self.frame + 1) % self.video.frames;
-        Some(self.video.frame(current))
+    pub fn frames(&self) -> usize {
+        self.frames
     }
 }

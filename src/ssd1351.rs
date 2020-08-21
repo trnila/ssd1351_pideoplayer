@@ -2,6 +2,7 @@ use gpio_cdev::LineHandle;
 use spidev::{SpiModeFlags, Spidev, SpidevOptions};
 use std::fmt;
 use std::io::Write;
+use crate::video::Frame;
 
 pub struct Display<'a> {
     spi: Spidev,
@@ -226,9 +227,9 @@ impl<'a> Display<'a> {
         Ok(())
     }
 
-    pub fn render(&mut self, fb: &[u8]) -> Result<(), TransferError> {
+    pub fn render(&mut self, fb: &Frame) -> Result<(), TransferError> {
         self.data_mode(true)?;
-        self.xmit(fb)
+        self.xmit(&fb.0)
     }
 
     fn xmit(&mut self, data: &[u8]) -> Result<(), TransferError> {
