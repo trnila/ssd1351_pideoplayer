@@ -2,6 +2,7 @@
 
 extern crate spidev;
 use std::{thread, time};
+use std::path::PathBuf;
 use std::time::{Instant, Duration};
 use gpio_cdev::{Chip, LineRequestFlags};
 use ssd1351::*;
@@ -19,6 +20,11 @@ fn main() -> Result<(), Box<dyn ::std::error::Error>> {
     const HEIGHT: usize = 128;
     const FPS: u32 = 25;
 
+    let videos_path = match std::env::args().nth(1) {
+        Some(path) => PathBuf::from(path),
+        None => panic!("Missing path to the videos directory")
+    };
+
     let mut chip = Chip::new("/dev/gpiochip0")?;
 
     let rst = chip
@@ -32,8 +38,8 @@ fn main() -> Result<(), Box<dyn ::std::error::Error>> {
         .request(LineRequestFlags::OUTPUT, 0, "oled-dc")?;
 
     let mut players = [
-        Player::new(Display::new(0, 0, &dc, WIDTH, HEIGHT)?, "1"),
-        Player::new(Display::new(0, 1, &dc, WIDTH, HEIGHT)?, "2"),
+        Player::new(Display::new(0, 0, &dc, WIDTH, HEIGHT)?, videos_path.join("1").to_str().unwrap()),
+        Player::new(Display::new(0, 1, &dc, WIDTH, HEIGHT)?, videos_path.join("2").to_str().unwrap()),
     ];
 
     let frames_period = Duration::from_secs_f32(1.0 / (FPS as f32));
