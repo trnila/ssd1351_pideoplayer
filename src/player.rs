@@ -83,6 +83,7 @@ impl<'a> Player<'a> {
         match self.current_video {
             Some(ref mut video) => {
                 self.display.render(&video.read_frame(self.current_frame as u64)?)?;
+                self.current_frame += 1;
                 Ok(())
             },
             None => Err(PlaybackError::NoVideo),
