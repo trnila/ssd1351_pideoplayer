@@ -38,7 +38,15 @@ impl Playlist {
     fn discover(&mut self) -> Result<(), std::io::Error> {
         self.files = fs::read_dir(&self.path)?
             .map(|res| res.map(|e| e.path().into_os_string().into_string().unwrap()))
-            .collect::<Result<Vec<_>, io::Error>>()?;
+            .collect::<Result<Vec<_>, io::Error>>()?
+            .into_iter()
+            .filter(|path| path.ends_with(".bgr565be"))
+            .collect();
+
+        for file in &self.files {
+            println!("Adding file {} from the playlist {}", file, self.path);
+        }
+
         Ok(())
     }
 
@@ -47,6 +55,8 @@ impl Playlist {
             self.discover()?;
             self.index = 0;
         }
+
+        println!("Playing next video {} from the playlist {}", &self.files[self.index], self.path);
 
         let video = Video::new(&self.files[self.index])?;
         self.index += 1;
