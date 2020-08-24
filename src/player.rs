@@ -9,7 +9,7 @@ use rand::seq::SliceRandom;
 #[derive(Error, Debug)]
 pub enum PlaybackError {
     #[error("No video in playlist")]
-    NoVideo,
+    EmptyPlaylist,
 
     #[error(transparent)]
     IOError(#[from] std::io::Error),
@@ -54,17 +54,25 @@ impl Playlist {
         Ok(())
     }
 
-    fn next(&mut self) -> Result<Video, VideoError> {
+    fn next(&mut self) -> Result<Video, PlaybackError> {
         if self.index >= self.files.len() {
             self.discover()?;
             self.index = 0;
         }
 
-        println!("Playing next video {} from the playlist {}", &self.files[self.index], self.path);
 
-        let video = Video::new(&self.files[self.index])?;
-        self.index += 1;
-        Ok(video)
+        match self.files.len() {
+            0 => {
+                println!("Playlist {} is empty!", self.path);
+                Err(PlaybackError::EmptyPlaylist)
+            },
+            _ => {
+                println!("Playing next video {} from the playlist {}", &self.files[self.index], self.path);
+                let video = Video::new(&self.files[self.index])?;
+                self.index += 1;
+                Ok(video)
+            }
+        }
     }
 }
 
@@ -100,7 +108,7 @@ impl<'a> Player<'a> {
                 self.current_frame += 1;
                 Ok(())
             },
-            None => Err(PlaybackError::NoVideo),
+            None => Err(PlaybackError::EmptyPlaylist),
         }
     }
 }
