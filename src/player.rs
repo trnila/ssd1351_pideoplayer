@@ -2,6 +2,8 @@ use std::{fs, io};
 use thiserror::Error;
 use crate::video::{Video, VideoError};
 use crate::ssd1351::{Display, TransferError};
+use rand::thread_rng;
+use rand::seq::SliceRandom;
 
 
 #[derive(Error, Debug)]
@@ -42,6 +44,8 @@ impl Playlist {
             .into_iter()
             .filter(|path| path.ends_with(".bgr565be"))
             .collect();
+
+        self.files.shuffle(&mut thread_rng());
 
         for file in &self.files {
             println!("Adding file {} from the playlist {}", file, self.path);
